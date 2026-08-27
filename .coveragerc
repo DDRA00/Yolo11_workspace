@@ -1,0 +1,20 @@
+# Coverage settings for the workspace-contract test job.
+#
+# The job measures scripts/ because those are the workspace's own executable
+# contract: they validate the checkout and gate submodule revisions, and they
+# run with nothing but PyYAML and requests available.
+
+[run]
+omit =
+    # Regenerating the color-conformance fixture means importing and running
+    # *both* submodule implementations, which needs OpenCV, numpy and each
+    # project's runtime. The workspace-contract job deliberately installs none
+    # of that, so this script cannot execute here and measuring it would only
+    # report a number nobody can move.
+    #
+    # It is not therefore unverified. Its output is checked three ways: the
+    # inference suite and the training suite each pin their implementation to
+    # the fixture, and tests/test_color_conformance_fixture.py asserts the two
+    # checked-in copies are byte-identical, so editing one side's expectations
+    # without the other fails rather than drifts.
+    scripts/generate_color_conformance.py
