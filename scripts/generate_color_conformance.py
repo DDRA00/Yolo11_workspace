@@ -9,8 +9,8 @@ the gate and behave differently on the line, and nothing in either repository
 can notice on its own.
 
 Rather than couple the two release cadences behind a shared package, they
-share a *fixture*: byte-identical copies of ``tests/data/color_conformance.json``
-live in both repositories. Each repository's own suite -- which already has
+share a *fixture*: byte-identical copies of
+``tests/fixtures/color_conformance.json`` live in both repositories. Each repository's own suite -- which already has
 OpenCV -- asserts its implementation matches the cases, and the workspace CI
 asserts the two copies are identical. Editing one side's expectations without
 the other therefore fails a check instead of drifting quietly.
@@ -66,8 +66,13 @@ FIXTURES = (
     TRAINING / "tests" / "fixtures" / "color_conformance.json",
 )
 
-#: Each case is a stack of horizontal HSV bands, so a case is reproducible from
-#: numbers alone -- no image files to keep in sync between two repositories.
+#: Each case is a stack of HSV bands, so a case is reproducible from numbers
+#: alone -- no image files to keep in sync between two repositories. Bands run
+#: across the height by default; ``orientation: vertical`` runs them across the
+#: width, and ``height``/``width`` make the patch elongated. Both matter: a
+#: per-axis center crop and one derived from ``min(h, w)`` are identical on a
+#: square patch, so square-only cases cannot see a sampling-geometry change,
+#: and bands that run along the uncropped axis cannot either.
 CASES: tuple[tuple[str, dict], ...] = (
     ("pure red", {"bands": [[4, 210, 190]]}),
     ("pure orange", {"bands": [[12, 210, 210]]}),
@@ -90,29 +95,108 @@ CASES: tuple[tuple[str, dict], ...] = (
     ("yellow leaning orange", {"bands": [[22, 200, 220]]}),
     ("green at the edge of its hue gate", {"bands": [[70, 120, 80]]}),
     ("desaturated red", {"bands": [[4, 60, 190]]}),
+    # Elongated, with the bands running along the axis the crop trims most.
+    # A wire ROI is this shape, and this is where a per-axis crop and a
+    # min(h, w) crop keep different amounts of the end band.
+    (
+        "wide red strip with an orange end",
+        {
+            "height": 96,
+            "width": 384,
+            "orientation": "vertical",
+            "bands": [[4, 210, 190], [4, 210, 190], [12, 200, 210]],
+        },
+    ),
+    (
+        "tall red strip with an orange end",
+        {
+            "height": 384,
+            "width": 96,
+            "bands": [[4, 210, 190], [4, 210, 190], [12, 200, 210]],
+        },
+    ),
+    # A shortcut that returns on the first color it recognizes reports that
+    # color even when it is the minority, so a minority band is what makes the
+    # shortcut visible at all.
+    (
+        "yellow minority beside green",
+        {
+            "bands": [
+                [28, 190, 220],
+                [28, 190, 220],
+                [85, 120, 60],
+                [85, 120, 60],
+                [85, 120, 60],
+            ]
+        },
+    ),
+    (
+        "yellow minority beside black",
+        {
+            "bands": [
+                [28, 190, 220],
+                [28, 190, 220],
+                [0, 20, 30],
+                [0, 20, 30],
+                [0, 20, 30],
+            ]
+        },
+    ),
+    # A dominance override that replaces the winner with a minority color is
+    # only observable when that color is in fact the minority.
+    (
+        "red majority with a green minority",
+        {
+            "bands": [
+                [4, 210, 190],
+                [4, 210, 190],
+                [4, 210, 190],
+                [85, 120, 60],
+                [85, 120, 60],
+            ]
+        },
+    ),
 )
 
-DIVERGENCE_REASON = (
-    "The training gate takes max(per-color threshold, default) while the "
-    "runtime takes the per-color threshold as it stands, so with the default "
-    "at 0.35 the gate is stricter than the line for yellow, orange, red and "
-    "green. Recorded rather than removed: a gate stricter than what it gates "
-    "is the safe direction, but the difference was undocumented, and pinning "
-    "it here means either side moving has to be a deliberate edit."
-)
+#: Keyed by case name, because one shared sentence stops being true the moment
+#: a second, unrelated difference appears -- and then every divergence carries
+#: an explanation that fits none of them.
+DIVERGENCE_REASONS: dict[str, str] = {
+    "desaturated red": (
+        "The training gate takes max(per-color threshold, default) while the "
+        "runtime takes the per-color threshold as it stands, so with the "
+        "default at 0.35 the gate is stricter than the line for yellow, "
+        "orange, red and green. Recorded rather than removed: a gate stricter "
+        "than what it gates is the safe direction, but the difference was "
+        "undocumented, and pinning it here means either side moving has to be "
+        "a deliberate edit."
+    ),
+}
 
 
 def render(spec: dict) -> np.ndarray:
-    """Build a BGR patch from a band spec."""
+    """Build a BGR patch from a band spec.
+
+    ``size`` gives a square patch; ``height``/``width`` give an elongated one,
+    and ``orientation`` says which axis the bands run along. Geometry belongs in
+    the spec because it is part of the contract: on a square patch a per-axis
+    center crop and one derived from ``min(h, w)`` are the same crop, so a
+    square-only fixture cannot tell the two apart -- which is how the runtime
+    and the gate drifted apart on the elongated ROIs the line measures.
+    """
     size = int(spec.get("size", 96))
-    hsv = np.zeros((size, size, 3), np.uint8)
+    height = int(spec.get("height", size))
+    width = int(spec.get("width", size))
     bands = spec["bands"]
-    edges = np.linspace(0, size, len(bands) + 1).astype(int)
+    vertical = str(spec.get("orientation", "horizontal")) == "vertical"
+    hsv = np.zeros((height, width, 3), np.uint8)
+    edges = np.linspace(0, width if vertical else height, len(bands) + 1).astype(int)
     for index, band in enumerate(bands):
         low, high = edges[index], edges[index + 1]
-        hsv[low:high, :, 0] = band[0]
-        hsv[low:high, :, 1] = band[1]
-        hsv[low:high, :, 2] = band[2]
+        region = hsv[:, low:high] if vertical else hsv[low:high, :]
+        region[:, :, 0] = band[0]
+        region[:, :, 1] = band[1]
+        region[:, :, 2] = band[2]
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
 
@@ -165,7 +249,7 @@ def build_payload() -> tuple[dict, list[str]]:
                 "color": run_color if run_color == gate_color else None,
                 "inference_confident": run_confident,
                 "training_confident": gate_confident,
-                "reason": DIVERGENCE_REASON,
+                "reason": DIVERGENCE_REASONS.get(name, ""),
             }
         )
 
@@ -209,6 +293,25 @@ def main(argv: list[str] | None = None) -> int:
         f"\n{len(payload['cases'])} agreed cases, "
         f"{len(payload['known_divergences'])} recorded divergences"
     )
+
+    # A disagreement nobody has explained is a discovery, not a contract. Refuse
+    # to record it in either mode: writing it would turn "the two sides differ
+    # here for this reason" into "the two sides differ here", which reads as
+    # reviewed and is not.
+    unexplained = [
+        str(item["name"])
+        for item in payload["known_divergences"]
+        if not str(item.get("reason", "")).strip()
+    ]
+    if unexplained:
+        print(
+            "\nUnexplained divergence: "
+            + ", ".join(unexplained)
+            + "\nEither fix the side that moved, or add the reason to "
+            "DIVERGENCE_REASONS in this script and run it again.",
+            file=sys.stderr,
+        )
+        return 1
 
     stale = [
         path
