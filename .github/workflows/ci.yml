@@ -109,6 +109,13 @@ jobs:
       - name: Test workspace scripts with coverage
         run: python -m pytest -q tests --cov=scripts --cov-report=term-missing --cov-fail-under=80
 
+      # The suites in each repository pin themselves to the shared fixture, and
+      # the test above checks the two copies still match -- but neither runs the
+      # two implementations against each other. Only this does, so a rule that
+      # moves on one side is a discovery here rather than on the line.
+      - name: Check the color implementations still agree
+        run: python scripts/generate_color_conformance.py --check
+
       - name: Verify workspace contract test collection
         run: |
           python -m pytest --collect-only -q Yolo11_auto_train/tests/test_workspace_paths.py
