@@ -8,6 +8,7 @@ __pycache__/
 .tmp/
 .ruff_cache/
 .venv/
+.venv-qml/
 
 # Runtime output owned by the local workstation
 logs/
