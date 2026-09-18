@@ -22,4 +22,10 @@ Result/
 # Local-only configuration
 .env
 .env.*
+# Endpoint addresses arrive named after their service (qwen.env), which the
+# two rules above do not match: they only cover files whose name *starts*
+# with .env. The vision client deliberately keeps addresses out of the code,
+# so a file like this sitting in the worktree is the one way they still get
+# committed.
+*.env
 !.env.example
