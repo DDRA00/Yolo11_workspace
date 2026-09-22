@@ -1,8 +1,8 @@
 [submodule "Yolo11_auto_train"]
 	path = Yolo11_auto_train
 	url = https://github.com/DioWang67/Yolo11_auto_train.git
-	branch = feature/operator-retraining-workflow-20260715
+	branch = main
 [submodule "yolo11_inference"]
 	path = yolo11_inference
 	url = https://github.com/DioWang67/Yolo_anomalib.git
-	branch = feature/operator-retraining-workflow-20260715
+	branch = main
