@@ -6,7 +6,7 @@ mypy==1.19.1
 # the line. Headless because this job has no display.
 numpy==1.26.4
 opencv-python-headless==4.9.0.80
-pytest==8.3.3
+pytest==9.0.3
 pytest-cov==7.0.0
 ruff==0.14.10
 tqdm==4.67.1
