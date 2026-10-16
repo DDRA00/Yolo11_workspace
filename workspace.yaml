@@ -5,3 +5,6 @@ projects:
 paths:
   training_data: Yolo11_auto_train/data
   inference_models: yolo11_inference/models
+  station_data: station_data/yolo11_inference
+  inference_results: Result
+  inference_artifacts: release_artifacts/yolo11_inference

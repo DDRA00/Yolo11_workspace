@@ -1,0 +1,28 @@
+{
+  "schema_version": 2,
+  "projects": {
+    "Yolo11_auto_train": {
+      "repository": "DioWang67/Yolo11_auto_train",
+      "workflow": ".github/workflows/ci.yml",
+      "required_checks": [
+        "Blocking quality gates",
+        "Tests (ubuntu-latest, Python 3.10)",
+        "Tests (windows-latest, Python 3.11)",
+        "Coverage gates",
+        "Build package"
+      ]
+    },
+    "yolo11_inference": {
+      "repository": "DioWang67/Yolo_anomalib",
+      "workflow": ".github/workflows/ci.yml",
+      "required_checks": [
+        "Blocking quality gates",
+        "Tests (ubuntu-latest, Python 3.10)",
+        "Tests (windows-latest, Python 3.11)",
+        "Coverage gates",
+        "Python package",
+        "Verified Windows executable"
+      ]
+    }
+  }
+}

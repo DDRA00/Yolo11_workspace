@@ -1,0 +1,142 @@
+name: Workspace CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONUTF8: "1"
+
+jobs:
+  workspace-contract:
+    name: Submodules and workspace contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ${{ github.workspace }}/Yolo11_auto_train/src:${{ github.workspace }}/yolo11_inference
+    steps:
+      - name: Check out pinned projects
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify submodule revisions
+        shell: bash
+        run: |
+          submodule_status="$(git submodule status --recursive)"
+          echo "$submodule_status"
+          if grep -Eq '^[+-U]' <<<"$submodule_status"; then
+            echo "A submodule is uninitialized, conflicted, or not at the pinned revision." >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: .github/requirements-ci.txt
+
+      - name: Require successful checks for the exact child revisions
+        env:
+          SUBMODULE_CHECKS_TOKEN: ${{ secrets.SUBMODULE_CHECKS_TOKEN }}
+        run: python scripts/verify_submodule_checks.py --root .
+
+      - name: Install contract-test dependencies
+        run: python -m pip install --requirement .github/requirements-ci.txt
+
+      - name: Verify dependency consistency
+        env:
+          # Avoid discovering developer-only editable metadata in child sources.
+          PYTHONPATH: ""
+        run: python -m pip check
+
+      - name: Lint pinned training revision
+        working-directory: Yolo11_auto_train
+        run: python -m ruff check src tests
+
+      - name: Type-check pinned training revision
+        working-directory: Yolo11_auto_train
+        run: python -m mypy src/picture_tool
+
+      - name: Check pinned inference revision
+        working-directory: yolo11_inference
+        run: |
+          python -m ruff check core app camera tools tests --select E9,F63,F7,F82,F811,B023
+          python -m ruff check \
+            core/services/inspection_database.py \
+            core/services/inspection_excel_report.py \
+            core/services/inspection_history.py \
+            core/services/inspection_maintenance.py \
+            core/services/inspection_release_store.py \
+            core/services/inspection_sync.py \
+            app/gui/inspection_history_page.py \
+            app/gui/panels/control_panel.py \
+            tools/check_runtime_environment.py \
+            tools/inspection_sync_admin.py \
+            tools/maintain_inspection_data.py \
+            tools/production_preflight.py \
+            tools/restore_inspection_database.py
+          python -m mypy --follow-imports=skip --ignore-missing-imports --explicit-package-bases \
+            core/services/inspection_database.py \
+            core/services/inspection_excel_report.py \
+            core/services/inspection_history.py \
+            core/services/inspection_maintenance.py \
+            core/services/inspection_release_store.py \
+            core/services/inspection_sync.py \
+            app/gui/inspection_history_page.py \
+            app/gui/panels/control_panel.py \
+            tools/check_runtime_environment.py \
+            tools/inspection_sync_admin.py \
+            tools/production_preflight.py \
+            tools/restore_inspection_database.py
+
+      - name: Validate the checked-out workspace
+        run: python scripts/validate_workspace.py --root .
+
+      - name: Test workspace scripts with coverage
+        run: python -m pytest -q tests --cov=scripts --cov-report=term-missing --cov-fail-under=80
+
+      # The suites in each repository pin themselves to the shared fixture, and
+      # the test above checks the two copies still match -- but neither runs the
+      # two implementations against each other. Only this does, so a rule that
+      # moves on one side is a discovery here rather than on the line.
+      - name: Check the color implementations still agree
+        run: python scripts/generate_color_conformance.py --check
+
+      - name: Verify workspace contract test collection
+        run: |
+          python -m pytest --collect-only -q Yolo11_auto_train/tests/test_workspace_paths.py
+          python -m pytest --collect-only -q yolo11_inference/tests/test_workspace_paths.py
+
+      - name: Test training workspace paths
+        run: |
+          python -c "from pathlib import Path; Path('reports').mkdir(exist_ok=True)"
+          python -m pytest -q Yolo11_auto_train/tests/test_workspace_paths.py \
+            --junitxml=reports/training-workspace-junit.xml
+
+      - name: Test inference workspace paths
+        run: |
+          python -m pytest -q yolo11_inference/tests/test_workspace_paths.py \
+            --junitxml=reports/inference-workspace-junit.xml
+
+      - name: Upload contract-test report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: workspace-contract-report
+          path: reports/*-workspace-junit.xml
+          if-no-files-found: warn
+          retention-days: 14
