@@ -22,6 +22,25 @@ yolo11_workspace/
 - Inspection images and the inspection-history database are stored in the
   workspace-level `Result` directory configured by `paths.inference_results`.
 
+## Architecture
+
+Read these in order:
+
+1. [`Yolo11_auto_train/docs/ARCHITECTURE.md`](Yolo11_auto_train/docs/ARCHITECTURE.md)
+   §1: every file contract between the two projects (handoff JSON, station model
+   directory, acceptance gate, shared locks, color fixture). It also covers the
+   training pipeline, the deploy gates and autotrain.
+2. [`yolo11_inference/docs/architecture/MODULE_ARCHITECTURE.md`](yolo11_inference/docs/architecture/MODULE_ARCHITECTURE.md)
+   ([繁中](yolo11_inference/docs/architecture/MODULE_ARCHITECTURE_ZH_TW.md)): the
+   production runtime, its subsystem map and its concurrency model.
+3. [`yolo11_inference/docs/DOCUMENTATION_INDEX.md`](yolo11_inference/docs/DOCUMENTATION_INDEX.md):
+   role-based entry point to the operations, data and model-lifecycle docs.
+
+The loop the two projects form: inspection → `Result/` → operator review →
+handoff to training → retrain → gates → `deploy` publishes into
+`yolo11_inference/models` → inspection. The training project's `deploy` task is
+the only code path that writes production models.
+
 ## Clone
 
 Clone the workspace and both child repositories together:
