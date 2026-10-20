@@ -1,14 +1,14 @@
-PyYAML==6.0.2
-mypy==1.19.1
+PyYAML==6.0.3
+mypy==2.4.0
 # The color-conformance check re-runs both implementations against each other,
 # which needs the image stack. Pinned to the inference runtime's own versions so
 # a borderline verdict cannot flip on a cv2 or numpy difference between CI and
 # the line. Headless because this job has no display.
-numpy==1.26.4
-opencv-python-headless==4.11.0.86
-pytest==9.0.3
-pytest-cov==7.0.0
-ruff==0.14.10
-tqdm==4.67.1
-types-PyYAML==6.0.12.20250915
-types-requests==2.32.4.20260107
+numpy==2.5.4
+opencv-python-headless==5.0.0.93
+pytest==9.1.1
+pytest-cov==7.1.0
+ruff==0.17.1
+tqdm==4.70.1
+types-PyYAML==6.0.12.20260906
+types-requests==2.33.0.20261006
