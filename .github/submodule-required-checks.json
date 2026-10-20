@@ -6,7 +6,7 @@
       "workflow": ".github/workflows/ci.yml",
       "required_checks": [
         "Blocking quality gates",
-        "Tests (ubuntu-latest, Python 3.10)",
+        "Tests (ubuntu-latest, Python 3.11)",
         "Tests (windows-latest, Python 3.11)",
         "Coverage gates",
         "Build package"
@@ -17,7 +17,7 @@
       "workflow": ".github/workflows/ci.yml",
       "required_checks": [
         "Blocking quality gates",
-        "Tests (ubuntu-latest, Python 3.10)",
+        "Tests (ubuntu-latest, Python 3.11)",
         "Tests (windows-latest, Python 3.11)",
         "Coverage gates",
         "Python package",
